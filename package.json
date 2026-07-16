@@ -1,0 +1,17 @@
+{
+  "name": "macrofactor-ts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "tsx tests-ts/run.ts && tsx tests-ts/barcode.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@types/node": "^26.1.1"
+  }
+}
