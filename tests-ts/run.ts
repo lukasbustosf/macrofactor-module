@@ -61,6 +61,26 @@ const alt = recommendByRate(2550, 98.5, -0.5);
 // 2550 + (98.5 * -0.5/100 * 7700)/7 = 2550 - 542.375 = 2007.625
 assert(approx(alt, 2550 - (98.5 * 0.005 * 7700) / 7), `tasa -0.5%/sem (got ${alt})`);
 
+console.log("== Test 5: flujo end-to-end simulado (forma de compute_weekly) ==");
+// Simula lo que hace compute_weekly: mapea filas de Supabase -> DailyLog[] -> weeklyRecompute
+const rows = [
+  { fecha: "2026-01-05", peso_kg: 99.0, calorias_consumidas: 2000, agua_ml: 3000 },
+  { fecha: "2026-01-06", peso_kg: 99.0, calorias_consumidas: 2000, agua_ml: 2500 },
+  { fecha: "2026-01-07", peso_kg: 99.0, calorias_consumidas: 2000, agua_ml: 3000 },
+  { fecha: "2026-01-12", peso_kg: 98.5, calorias_consumidas: 2000, agua_ml: 3000 },
+  { fecha: "2026-01-13", peso_kg: 98.5, calorias_consumidas: 2000, agua_ml: 3000 },
+  { fecha: "2026-01-14", peso_kg: 98.5, calorias_consumidas: 2000, agua_ml: 3000 },
+];
+const mapped: DailyLog[] = rows.map((r) => ({
+  day: r.fecha,
+  weightKg: r.peso_kg,
+  intakeKcal: r.calorias_consumidas,
+  waterMl: r.agua_ml,
+}));
+const endRes = weeklyRecompute(mapped, 0.20);
+assert(approx(endRes.tdee, 2550), `E2E TDEE = 2550 (got ${endRes.tdee})`);
+assert(approx(endRes.metaDiaria, 2040), `E2E meta = 2040 (got ${endRes.metaDiaria})`);
+
 if (failures > 0) {
   console.error(`\n${failures} test(s) fallaron`);
   process.exit(1);
