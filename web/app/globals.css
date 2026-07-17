@@ -1,2 +1,26 @@
-html, body { padding: 0; margin: 0; }
-* { box-sizing: border-box; }
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light dark;
+}
+
+html,
+body {
+  padding: 0;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
+
+/* evita el destello (FOUC) del dark mode antes del hidratado */
+.no-transitions * {
+  transition: none !important;
+}

@@ -4,6 +4,15 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { TrendChart } from "./TrendChart";
 import { coach } from "@/lib/coach";
+import { useTheme } from "@/lib/theme";
+import {
+  Card,
+  Button,
+  Input,
+  Tabs,
+  Toggle,
+  EmptyState,
+} from "@/components/ui";
 
 const supabase = createClient();
 
@@ -23,6 +32,8 @@ interface Perfil {
 }
 
 const META_AGUA_ML = 3000;
+type TabId = "hoy" | "semana" | "agua" | "perfil";
+type Modo = "login" | "signup";
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
@@ -37,17 +48,21 @@ export default function Home() {
   const [corr, setCorr] = useState<any>(null);
   const [corrLoading, setCorrLoading] = useState(false);
 
-  const [modo, setModo] = useState<"login" | "signup">("login");
+  const [modo, setModo] = useState<Modo>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authMsg, setAuthMsg] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
 
-  // onboarding
   const [onboarding, setOnboarding] = useState(false);
   const [obAltura, setObAltura] = useState("");
   const [obObjetivo, setObObjetivo] = useState<Perfil["objetivo"]>("cut");
   const [obDeficit, setObDeficit] = useState("15");
+
+  const [tab, setTab] = useState<TabId>("hoy");
+  const { theme, toggle } = useTheme();
+
+  const hoy = new Date().toISOString().slice(0, 10);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -59,8 +74,6 @@ export default function Home() {
     });
     return () => sub.subscription.unsubscribe();
   }, []);
-
-  const hoy = new Date().toISOString().slice(0, 10);
 
   async function cargarPerfil() {
     if (!user) return;
@@ -106,11 +119,14 @@ export default function Home() {
 
   async function guardarPerfil() {
     if (!user) return;
-    await supabase.from("perfiles").update({
-      altura_cm: obAltura ? parseInt(obAltura) : null,
-      objetivo: obObjetivo,
-      deficit_objetivo: parseInt(obDeficit) / 100,
-    }).eq("id", user.id);
+    await supabase
+      .from("perfiles")
+      .update({
+        altura_cm: obAltura ? parseInt(obAltura) : null,
+        objetivo: obObjetivo,
+        deficit_objetivo: parseInt(obDeficit) / 100,
+      })
+      .eq("id", user.id);
     setOnboarding(false);
     await cargarPerfil();
   }
@@ -124,9 +140,9 @@ export default function Home() {
       calorias_consumidas: calorias ? parseInt(calorias) : 0,
       agua_ml: registro?.agua_ml ?? 0,
     };
-    await supabase.from("registros_diarios").upsert(payload, {
-      onConflict: "user_id,fecha",
-    });
+    await supabase
+      .from("registros_diarios")
+      .upsert(payload, { onConflict: "user_id,fecha" });
     await cargarRegistro();
   }
 
@@ -199,104 +215,99 @@ export default function Home() {
     }
   }
 
-  if (loading) return <main className="p-6">Cargando…</main>;
+  if (loading) return <main className="p-6 animate-fade-in">Cargando…</main>;
 
   if (!user)
     return (
-      <main className="max-w-md mx-auto p-4 space-y-5">
+      <main className="max-w-md mx-auto p-4 space-y-5 animate-fade-in">
         <h1 className="text-2xl font-bold">MacroFactor Module</h1>
-        <form
-          onSubmit={handleAuth}
-          className="bg-white rounded-2xl shadow p-4 space-y-3"
-        >
-          <h2 className="font-semibold">
+        <Card>
+          <h2 className="font-semibold mb-3">
             {modo === "login" ? "Iniciar sesión" : "Crear cuenta"}
           </h2>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="Email"
-            className="w-full border rounded-xl px-3 py-2"
-          />
-          <input
-            type="password"
-            required
-            minLength={6}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password (mín. 6)"
-            className="w-full border rounded-xl px-3 py-2"
-          />
-          <button
-            type="submit"
-            disabled={authLoading}
-            className="w-full bg-black text-white rounded-xl py-3 font-semibold disabled:opacity-50"
+          <form
+            onSubmit={handleAuth}
+            className="space-y-3"
           >
-            {authLoading
-              ? "…"
-              : modo === "login"
-                ? "Entrar"
-                : "Registrarme"}
-          </button>
-          {authMsg && <p className="text-sm text-red-600">{authMsg}</p>}
+            <Input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Email"
+            />
+            <Input
+              type="password"
+              required
+              minLength={6}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password (mín. 6)"
+            />
+            <Button type="submit" disabled={authLoading}>
+              {authLoading
+                ? "…"
+                : modo === "login"
+                  ? "Entrar"
+                  : "Registrarme"}
+            </Button>
+          </form>
+          {authMsg && <p className="text-sm text-red-600 mt-2">{authMsg}</p>}
           <button
             type="button"
             onClick={() => {
               setModo(modo === "login" ? "signup" : "login");
               setAuthMsg("");
             }}
-            className="w-full text-sm text-blue-600"
+            className="w-full text-sm text-brand-600 dark:text-brand-300 mt-2"
           >
             {modo === "login"
               ? "¿No tienes cuenta? Regístrate"
               : "¿Ya tienes cuenta? Inicia sesión"}
           </button>
-        </form>
+        </Card>
       </main>
     );
 
   if (onboarding)
     return (
-      <main className="max-w-md mx-auto p-4 space-y-5">
+      <main className="max-w-md mx-auto p-4 space-y-5 animate-fade-in">
         <h1 className="text-2xl font-bold">Bienvenido</h1>
-        <section className="bg-white rounded-2xl shadow p-4 space-y-3">
-          <p className="text-sm text-gray-600">
+        <Card className="space-y-3">
+          <p className="text-sm text-slate-500 dark:text-slate-400">
             Necesitamos unos datos para estimar tu gasto.
           </p>
-          <label className="block text-sm">Altura (cm)</label>
-          <input
+          <Input
+            label="Altura (cm)"
             type="number"
             value={obAltura}
             onChange={(e) => setObAltura(e.target.value)}
             placeholder="ej. 175"
-            className="w-full border rounded-xl px-3 py-2"
           />
-          <label className="block text-sm">Objetivo</label>
-          <select
-            value={obObjetivo}
-            onChange={(e) => setObObjetivo(e.target.value as Perfil["objetivo"])}
-            className="w-full border rounded-xl px-3 py-2"
-          >
-            <option value="cut">Bajar grasa (cut)</option>
-            <option value="bulk">Ganar músculo (bulk)</option>
-            <option value="maintenance">Mantener</option>
-          </select>
-          <label className="block text-sm">Déficit objetivo (%)</label>
-          <input
+          <label className="block">
+            <span className="block text-sm text-slate-500 dark:text-slate-400 mb-1">
+              Objetivo
+            </span>
+            <select
+              value={obObjetivo}
+              onChange={(e) =>
+                setObObjetivo(e.target.value as Perfil["objetivo"])
+              }
+              className="w-full border border-slate-200 dark:border-slate-600 rounded-xl px-3 py-2 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100"
+            >
+              <option value="cut">Bajar grasa (cut)</option>
+              <option value="bulk">Ganar músculo (bulk)</option>
+              <option value="maintenance">Mantener</option>
+            </select>
+          </label>
+          <Input
+            label="Déficit objetivo (%)"
             type="number"
             value={obDeficit}
             onChange={(e) => setObDeficit(e.target.value)}
-            className="w-full border rounded-xl px-3 py-2"
           />
-          <button
-            onClick={guardarPerfil}
-            className="w-full bg-black text-white rounded-xl py-3 font-semibold"
-          >
-            Guardar y empezar
-          </button>
-        </section>
+          <Button onClick={guardarPerfil}>Guardar y empezar</Button>
+        </Card>
       </main>
     );
 
@@ -307,144 +318,196 @@ export default function Home() {
     tdee,
     deficitPct: deficit,
     objetivo: perfil?.objetivo ?? "cut",
-    trendPesoKg: historial.filter((h) => h.peso_kg != null).slice(-7).reduce(
-      (a, h, _, arr) => a + (h.peso_kg ?? 0) / arr.length,
+    trendPesoKg:
+      historial
+        .filter((h) => h.peso_kg != null)
+        .slice(-7)
+        .reduce((a, h, _, arr) => a + (h.peso_kg ?? 0) / arr.length, 0) ||
+      parseFloat(peso) ||
       0,
-    ) || parseFloat(peso) || 0,
     confidence: historial.length >= 7 ? 0.6 : 0.2,
   });
   const metaDiaria = Math.round(c.targetIntake);
   const consumido = registro?.calorias_consumidas ?? 0;
   const restante = metaDiaria - consumido;
-
   const agua = registro?.agua_ml ?? 0;
   const aguaPct = Math.min(100, Math.round((agua / META_AGUA_ML) * 100));
 
+  const tabs = [
+    { id: "hoy" as TabId, label: "Hoy", icon: "🏠" },
+    { id: "semana" as TabId, label: "Semana", icon: "📈" },
+    { id: "agua" as TabId, label: "Agua", icon: "💧" },
+    { id: "perfil" as TabId, label: "Perfil", icon: "👤" },
+  ];
+
   return (
-    <main className="max-w-md mx-auto p-4 space-y-5">
+    <main className="max-w-md mx-auto p-4 space-y-4 animate-fade-in">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Hoy</h1>
-        <button
-          onClick={async () => {
-            await supabase.auth.signOut();
-            setUser(null);
-          }}
-          className="text-sm text-gray-500"
-        >
-          Salir
-        </button>
+        <h1 className="text-xl font-bold">MacroFactor</h1>
+        <div className="flex items-center gap-3">
+          <Toggle on={theme === "dark"} onToggle={toggle} label="🌙" />
+          <button
+            onClick={async () => {
+              await supabase.auth.signOut();
+              setUser(null);
+            }}
+            className="text-sm text-slate-500 dark:text-slate-400"
+          >
+            Salir
+          </button>
+        </div>
       </div>
 
-      {/* Resumen del día: TDEE + meta + restante */}
-      <section className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl shadow p-4">
-        <p className="text-sm opacity-90">Tu objetivo de hoy</p>
-        <p className="text-3xl font-bold">{metaDiaria} kcal</p>
-        <div className="mt-2 text-sm opacity-90">
-          Consumido: {consumido} · Restante:{" "}
-          <b className={restante < 0 ? "text-red-200" : "text-green-200"}>
-            {restante} kcal
-          </b>
-        </div>
-        <p className="mt-1 text-xs opacity-80">
-          TDEE estimado: {Math.round(tdee)} kcal · déficit {Math.round(deficit * 100)}%
-        </p>
-        {c.note && <p className="mt-2 text-xs opacity-90">{c.note}</p>}
-      </section>
+      <Tabs tabs={tabs} active={tab} onChange={setTab} />
 
-      <section className="bg-white rounded-2xl shadow p-4 space-y-3">
-        <label className="block text-sm text-gray-600">
-          Peso (ayunas, kg)
-        </label>
-        <input
-          type="number"
-          inputMode="decimal"
-          value={peso}
-          onChange={(e) => setPeso(e.target.value)}
-          placeholder="ej. 98.5"
-          className="w-full border rounded-xl px-3 py-2"
-        />
-        <label className="block text-sm text-gray-600">
-          Calorías consumidas
-        </label>
-        <input
-          type="number"
-          inputMode="numeric"
-          value={calorias}
-          onChange={(e) => setCalorias(e.target.value)}
-          placeholder="ej. 2000"
-          className="w-full border rounded-xl px-3 py-2"
-        />
-        <button
-          onClick={guardar}
-          className="w-full bg-black text-white rounded-xl py-3 font-semibold"
-        >
-          Guardar registro
-        </button>
-      </section>
-
-      <section className="bg-blue-50 rounded-2xl shadow p-4">
-        <div className="flex justify-between items-center mb-2">
-          <span className="font-semibold">Agua</span>
-          <span className="text-sm text-gray-600">
-            {agua} / {META_AGUA_ML} ml
-          </span>
-        </div>
-        <div className="h-3 bg-blue-200 rounded-full overflow-hidden mb-3">
-          <div
-            className="h-full bg-blue-500"
-            style={{ width: `${aguaPct}%` }}
-          />
-        </div>
-        {aguaPct >= 100 && (
-          <p className="text-green-600 text-sm mb-2">
-            ✓ Meta de agua alcanzada
-          </p>
-        )}
-        <button
-          onClick={() => addAgua(500)}
-          className="w-full bg-blue-500 text-white rounded-xl py-4 text-lg font-bold active:scale-95 transition"
-        >
-          + 500 ml 💧
-        </button>
-      </section>
-
-      <section className="bg-white rounded-2xl shadow p-4">
-        <h2 className="font-semibold mb-2">Correlación agua → peso de mañana</h2>
-        <button
-          onClick={verCorrelacion}
-          disabled={corrLoading}
-          className="w-full bg-purple-600 text-white rounded-xl py-3 font-semibold disabled:opacity-50"
-        >
-          {corrLoading ? "Calculando…" : "Ver correlación"}
-        </button>
-        {corr?.error && (
-          <p className="text-red-600 text-sm mt-2">{corr.error}</p>
-        )}
-        {corr && !corr.error && (
-          <div className="mt-3 text-sm space-y-1">
-            <p>
-              <b>r</b> = {corr.r?.toFixed(2)} · <b>n</b> = {corr.n} ·{" "}
-              <b>p</b> = {corr.p_value?.toFixed(2)}
+      {tab === "hoy" && (
+        <div className="space-y-4 animate-fade-in">
+          <Card className="bg-gradient-to-br from-brand-500 to-purple-600 text-white border-0">
+            <p className="text-sm opacity-90">Tu objetivo de hoy</p>
+            <p className="text-3xl font-bold">{metaDiaria} kcal</p>
+            <div className="mt-2 text-sm opacity-90">
+              Consumido: {consumido} · Restante:{" "}
+              <b className={restante < 0 ? "text-red-200" : "text-green-200"}>
+                {restante} kcal
+              </b>
+            </div>
+            <p className="mt-1 text-xs opacity-80">
+              TDEE estimado: {Math.round(tdee)} kcal · déficit{" "}
+              {Math.round(deficit * 100)}%
             </p>
-            <p
-              className={
-                corr.interpretacion === "positivo"
-                  ? "text-green-600"
-                  : corr.interpretacion === "retencion"
-                    ? "text-amber-600"
-                    : "text-gray-600"
-              }
+            {c.note && <p className="mt-2 text-xs opacity-90">{c.note}</p>}
+          </Card>
+
+          <Card className="space-y-3">
+            <Input
+              label="Peso (ayunas, kg)"
+              type="number"
+              inputMode="decimal"
+              value={peso}
+              onChange={(e) => setPeso(e.target.value)}
+              placeholder="ej. 98.5"
+            />
+            <Input
+              label="Calorías consumidas"
+              type="number"
+              inputMode="numeric"
+              value={calorias}
+              onChange={(e) => setCalorias(e.target.value)}
+              placeholder="ej. 2000"
+            />
+            <Button onClick={guardar}>Guardar registro</Button>
+          </Card>
+        </div>
+      )}
+
+      {tab === "semana" && (
+        <div className="space-y-4 animate-fade-in">
+          {historial.length === 0 ? (
+            <Card>
+              <EmptyState
+                title="Sin datos todavía"
+                hint="Registra tu peso y calorías en la pestaña Hoy para ver la tendencia."
+              />
+            </Card>
+          ) : (
+            <Card>
+              <h2 className="font-semibold mb-2">Tendencia</h2>
+              <TrendChart datos={historial} />
+            </Card>
+          )}
+          <Card>
+            <h2 className="font-semibold mb-2">Agua → peso de mañana</h2>
+            <Button
+              onClick={verCorrelacion}
+              disabled={corrLoading}
+              variant="secondary"
             >
-              {corr.detalle}
-            </p>
-          </div>
-        )}
-      </section>
+              {corrLoading ? "Calculando…" : "Ver correlación"}
+            </Button>
+            {corr?.error && (
+              <p className="text-red-600 text-sm mt-2">{corr.error}</p>
+            )}
+            {corr && !corr.error && (
+              <div className="mt-3 text-sm space-y-1">
+                <p>
+                  <b>r</b> = {corr.r?.toFixed(2)} · <b>n</b> = {corr.n} · <b>p</b> ={" "}
+                  {corr.p_value?.toFixed(2)}
+                </p>
+                <p
+                  className={
+                    corr.interpretacion === "positivo"
+                      ? "text-green-600"
+                      : corr.interpretacion === "retencion"
+                        ? "text-amber-600"
+                        : "text-slate-600 dark:text-slate-300"
+                  }
+                >
+                  {corr.detalle}
+                </p>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
 
-      <section className="bg-white rounded-2xl shadow p-4">
-        <h2 className="font-semibold mb-2">Tendencia</h2>
-        <TrendChart datos={historial} />
-      </section>
+      {tab === "agua" && (
+        <div className="space-y-4 animate-fade-in">
+          <Card className="bg-blue-50 dark:bg-slate-800 border-0">
+            <div className="flex justify-between items-center mb-2">
+              <span className="font-semibold">Agua</span>
+              <span className="text-sm text-slate-600 dark:text-slate-300">
+                {agua} / {META_AGUA_ML} ml
+              </span>
+            </div>
+            <div className="h-3 bg-blue-200 dark:bg-slate-700 rounded-full overflow-hidden mb-3">
+              <div
+                className="h-full bg-blue-500"
+                style={{ width: `${aguaPct}%` }}
+              />
+            </div>
+            {aguaPct >= 100 && (
+              <p className="text-green-600 text-sm mb-2">
+                ✓ Meta de agua alcanzada
+              </p>
+            )}
+            <Button
+              onClick={() => addAgua(500)}
+              className="bg-blue-500 text-white"
+            >
+              + 500 ml 💧
+            </Button>
+          </Card>
+        </div>
+      )}
+
+      {tab === "perfil" && (
+        <div className="space-y-4 animate-fade-in">
+          <Card className="space-y-1">
+            <h2 className="font-semibold mb-2">Tu perfil</h2>
+            <p className="text-sm">
+              Email: <b>{user.email}</b>
+            </p>
+            <p className="text-sm">
+              Objetivo: <b>{perfil?.objetivo ?? "—"}</b>
+            </p>
+            <p className="text-sm">
+              Altura: <b>{perfil?.altura_cm ?? "—"} cm</b>
+            </p>
+            <p className="text-sm">
+              TDEE estimado: <b>{Math.round(tdee)} kcal</b>
+            </p>
+            <p className="text-sm">
+              Déficit: <b>{Math.round(deficit * 100)}%</b>
+            </p>
+          </Card>
+          <Card>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              El TDEE se recalcula solo cada lunes con tus registros. Sigue
+              cargando datos para mejorar la estimación.
+            </p>
+          </Card>
+        </div>
+      )}
     </main>
   );
 }

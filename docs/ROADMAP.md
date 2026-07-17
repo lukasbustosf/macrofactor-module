@@ -96,9 +96,10 @@ URLs verificadas (HTTP 200 / `/health` ok):
 - [x] Pantalla "Hoy": target de calorías + restante + TDEE estimado + coach.
 - **Resultado:** la app ya "es MacroFactor" y da valor real.
 
-### Fase 2 — Que se vea producto (medio esfuerzo)  ← SIGUIENTE
-- [ ] Sistema de diseño + navegación por tabs + dark mode + estados vacíos.
-- [ ] Meta de agua configurable + recordatorios.
+### Fase 2 — Que se vea producto (medio esfuerzo)  ← COMPLETA (2026-07-17)
+- [x] Sistema de diseño + navegación por tabs + dark mode + estados vacíos.
+- [x] Meta de agua configurable + recordatorios.
+- **Resultado:** la app se siente producto (tabs Hoy/Semana/Agua/Perfil, dark mode, componentes Card/Button/Input/Tabs/Toggle/EmptyState).
 
 ### Fase 3 — Diferencial comida (mayor esfuerzo)
 - [ ] Scanner barcode + registro de comidas por día + caché `alimentos`.
