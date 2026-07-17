@@ -1,0 +1,11 @@
+{
+  "name": "macrofactor-scripts",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "apply-schema": "node apply_schema.mjs"
+  },
+  "dependencies": {
+    "pg": "^8.12.0"
+  }
+}
