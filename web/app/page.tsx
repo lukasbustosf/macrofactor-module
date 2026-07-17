@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { TrendChart } from "./TrendChart";
+import { coach } from "@/lib/coach";
 
 const supabase = createClient();
 
@@ -13,28 +14,40 @@ interface Registro {
   agua_ml: number;
 }
 
+interface Perfil {
+  id: string;
+  altura_cm: number | null;
+  deficit_objetivo: number;
+  tdee_actual: number;
+  objetivo: "cut" | "bulk" | "maintenance" | "custom";
+}
+
 const META_AGUA_ML = 3000;
 
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // estado de registro
   const [registro, setRegistro] = useState<Registro | null>(null);
   const [peso, setPeso] = useState("");
   const [calorias, setCalorias] = useState("");
   const [historial, setHistorial] = useState<Registro[]>([]);
+  const [perfil, setPerfil] = useState<Perfil | null>(null);
 
-  // estado de correlacion
   const [corr, setCorr] = useState<any>(null);
   const [corrLoading, setCorrLoading] = useState(false);
 
-  // estado de auth (login/signup)
   const [modo, setModo] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [authMsg, setAuthMsg] = useState("");
   const [authLoading, setAuthLoading] = useState(false);
+
+  // onboarding
+  const [onboarding, setOnboarding] = useState(false);
+  const [obAltura, setObAltura] = useState("");
+  const [obObjetivo, setObObjetivo] = useState<Perfil["objetivo"]>("cut");
+  const [obDeficit, setObDeficit] = useState("15");
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -48,6 +61,19 @@ export default function Home() {
   }, []);
 
   const hoy = new Date().toISOString().slice(0, 10);
+
+  async function cargarPerfil() {
+    if (!user) return;
+    const { data } = await supabase
+      .from("perfiles")
+      .select("*")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (data) {
+      setPerfil(data as Perfil);
+      if (data.altura_cm == null) setOnboarding(true);
+    }
+  }
 
   async function cargarRegistro() {
     if (!user) return;
@@ -71,8 +97,23 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (user) cargarRegistro();
+    if (user) {
+      cargarPerfil();
+      cargarRegistro();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  async function guardarPerfil() {
+    if (!user) return;
+    await supabase.from("perfiles").update({
+      altura_cm: obAltura ? parseInt(obAltura) : null,
+      objetivo: obObjetivo,
+      deficit_objetivo: parseInt(obDeficit) / 100,
+    }).eq("id", user.id);
+    setOnboarding(false);
+    await cargarPerfil();
+  }
 
   async function guardar() {
     if (!user) return;
@@ -216,6 +257,66 @@ export default function Home() {
       </main>
     );
 
+  if (onboarding)
+    return (
+      <main className="max-w-md mx-auto p-4 space-y-5">
+        <h1 className="text-2xl font-bold">Bienvenido</h1>
+        <section className="bg-white rounded-2xl shadow p-4 space-y-3">
+          <p className="text-sm text-gray-600">
+            Necesitamos unos datos para estimar tu gasto.
+          </p>
+          <label className="block text-sm">Altura (cm)</label>
+          <input
+            type="number"
+            value={obAltura}
+            onChange={(e) => setObAltura(e.target.value)}
+            placeholder="ej. 175"
+            className="w-full border rounded-xl px-3 py-2"
+          />
+          <label className="block text-sm">Objetivo</label>
+          <select
+            value={obObjetivo}
+            onChange={(e) => setObObjetivo(e.target.value as Perfil["objetivo"])}
+            className="w-full border rounded-xl px-3 py-2"
+          >
+            <option value="cut">Bajar grasa (cut)</option>
+            <option value="bulk">Ganar músculo (bulk)</option>
+            <option value="maintenance">Mantener</option>
+          </select>
+          <label className="block text-sm">Déficit objetivo (%)</label>
+          <input
+            type="number"
+            value={obDeficit}
+            onChange={(e) => setObDeficit(e.target.value)}
+            className="w-full border rounded-xl px-3 py-2"
+          />
+          <button
+            onClick={guardarPerfil}
+            className="w-full bg-black text-white rounded-xl py-3 font-semibold"
+          >
+            Guardar y empezar
+          </button>
+        </section>
+      </main>
+    );
+
+  // --- Coach: meta diaria a partir de TDEE + déficit ---
+  const tdee = perfil?.tdee_actual ?? 2500;
+  const deficit = perfil?.deficit_objetivo ?? 0.15;
+  const c = coach({
+    tdee,
+    deficitPct: deficit,
+    objetivo: perfil?.objetivo ?? "cut",
+    trendPesoKg: historial.filter((h) => h.peso_kg != null).slice(-7).reduce(
+      (a, h, _, arr) => a + (h.peso_kg ?? 0) / arr.length,
+      0,
+    ) || parseFloat(peso) || 0,
+    confidence: historial.length >= 7 ? 0.6 : 0.2,
+  });
+  const metaDiaria = Math.round(c.targetIntake);
+  const consumido = registro?.calorias_consumidas ?? 0;
+  const restante = metaDiaria - consumido;
+
   const agua = registro?.agua_ml ?? 0;
   const aguaPct = Math.min(100, Math.round((agua / META_AGUA_ML) * 100));
 
@@ -233,6 +334,22 @@ export default function Home() {
           Salir
         </button>
       </div>
+
+      {/* Resumen del día: TDEE + meta + restante */}
+      <section className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-2xl shadow p-4">
+        <p className="text-sm opacity-90">Tu objetivo de hoy</p>
+        <p className="text-3xl font-bold">{metaDiaria} kcal</p>
+        <div className="mt-2 text-sm opacity-90">
+          Consumido: {consumido} · Restante:{" "}
+          <b className={restante < 0 ? "text-red-200" : "text-green-200"}>
+            {restante} kcal
+          </b>
+        </div>
+        <p className="mt-1 text-xs opacity-80">
+          TDEE estimado: {Math.round(tdee)} kcal · déficit {Math.round(deficit * 100)}%
+        </p>
+        {c.note && <p className="mt-2 text-xs opacity-90">{c.note}</p>}
+      </section>
 
       <section className="bg-white rounded-2xl shadow p-4 space-y-3">
         <label className="block text-sm text-gray-600">
