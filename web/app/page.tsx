@@ -18,16 +18,33 @@ const META_AGUA_ML = 3000;
 export default function Home() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // estado de registro
   const [registro, setRegistro] = useState<Registro | null>(null);
   const [peso, setPeso] = useState("");
   const [calorias, setCalorias] = useState("");
   const [historial, setHistorial] = useState<Registro[]>([]);
+
+  // estado de correlacion
+  const [corr, setCorr] = useState<any>(null);
+  const [corrLoading, setCorrLoading] = useState(false);
+
+  // estado de auth (login/signup)
+  const [modo, setModo] = useState<"login" | "signup">("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [authMsg, setAuthMsg] = useState("");
+  const [authLoading, setAuthLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
       setLoading(false);
     });
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUser(session?.user ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   const hoy = new Date().toISOString().slice(0, 10);
@@ -88,34 +105,6 @@ export default function Home() {
     await cargarRegistro();
   }
 
-  if (loading) return <main className="p-6">Cargando…</main>;
-
-  if (!user)
-    return (
-      <main className="p-6">
-        <h1 className="text-xl font-bold mb-4">MacroFactor Module</h1>
-        <button
-          className="bg-black text-white rounded-xl px-4 py-3 w-full"
-          onClick={async () => {
-            const email = prompt("Email:");
-            const pass = prompt("Password:");
-            if (email && pass)
-              await supabase.auth.signInWithPassword({ email, password: pass });
-            const { data } = await supabase.auth.getUser();
-            setUser(data.user);
-          }}
-        >
-          Iniciar sesión
-        </button>
-      </main>
-    );
-
-  const agua = registro?.agua_ml ?? 0;
-  const aguaPct = Math.min(100, Math.round((agua / META_AGUA_ML) * 100));
-
-  const [corr, setCorr] = useState<any>(null);
-  const [corrLoading, setCorrLoading] = useState(false);
-
   async function verCorrelacion() {
     setCorrLoading(true);
     setCorr(null);
@@ -128,10 +117,9 @@ export default function Home() {
     }
     const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL;
     try {
-      const res = await fetch(
-        `${backendUrl}/api/correlacion?dias=30`,
-        { headers: { Authorization: `Bearer ${jwt}` } },
-      );
+      const res = await fetch(`${backendUrl}/api/correlacion?dias=30`, {
+        headers: { Authorization: `Bearer ${jwt}` },
+      });
       const json = await res.json();
       setCorr(res.ok ? json : { error: json.detail || "Error" });
     } catch (e: any) {
@@ -141,12 +129,115 @@ export default function Home() {
     }
   }
 
+  async function handleAuth(e: React.FormEvent) {
+    e.preventDefault();
+    setAuthLoading(true);
+    setAuthMsg("");
+    try {
+      if (modo === "login") {
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) setAuthMsg(error.message);
+      } else {
+        const { data, error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) setAuthMsg(error.message);
+        else if (data.user && data.user.identities?.length === 0)
+          setAuthMsg("Ese email ya está registrado. Usa Iniciar sesión.");
+        else
+          setAuthMsg(
+            "Cuenta creada. Revisa tu email para confirmar (si está activada la confirmación).",
+          );
+      }
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  if (loading) return <main className="p-6">Cargando…</main>;
+
+  if (!user)
+    return (
+      <main className="max-w-md mx-auto p-4 space-y-5">
+        <h1 className="text-2xl font-bold">MacroFactor Module</h1>
+        <form
+          onSubmit={handleAuth}
+          className="bg-white rounded-2xl shadow p-4 space-y-3"
+        >
+          <h2 className="font-semibold">
+            {modo === "login" ? "Iniciar sesión" : "Crear cuenta"}
+          </h2>
+          <input
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Email"
+            className="w-full border rounded-xl px-3 py-2"
+          />
+          <input
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Password (mín. 6)"
+            className="w-full border rounded-xl px-3 py-2"
+          />
+          <button
+            type="submit"
+            disabled={authLoading}
+            className="w-full bg-black text-white rounded-xl py-3 font-semibold disabled:opacity-50"
+          >
+            {authLoading
+              ? "…"
+              : modo === "login"
+                ? "Entrar"
+                : "Registrarme"}
+          </button>
+          {authMsg && <p className="text-sm text-red-600">{authMsg}</p>}
+          <button
+            type="button"
+            onClick={() => {
+              setModo(modo === "login" ? "signup" : "login");
+              setAuthMsg("");
+            }}
+            className="w-full text-sm text-blue-600"
+          >
+            {modo === "login"
+              ? "¿No tienes cuenta? Regístrate"
+              : "¿Ya tienes cuenta? Inicia sesión"}
+          </button>
+        </form>
+      </main>
+    );
+
+  const agua = registro?.agua_ml ?? 0;
+  const aguaPct = Math.min(100, Math.round((agua / META_AGUA_ML) * 100));
+
   return (
     <main className="max-w-md mx-auto p-4 space-y-5">
-      <h1 className="text-2xl font-bold">Hoy</h1>
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold">Hoy</h1>
+        <button
+          onClick={async () => {
+            await supabase.auth.signOut();
+            setUser(null);
+          }}
+          className="text-sm text-gray-500"
+        >
+          Salir
+        </button>
+      </div>
 
       <section className="bg-white rounded-2xl shadow p-4 space-y-3">
-        <label className="block text-sm text-gray-600">Peso (ayunas, kg)</label>
+        <label className="block text-sm text-gray-600">
+          Peso (ayunas, kg)
+        </label>
         <input
           type="number"
           inputMode="decimal"
@@ -155,7 +246,9 @@ export default function Home() {
           placeholder="ej. 98.5"
           className="w-full border rounded-xl px-3 py-2"
         />
-        <label className="block text-sm text-gray-600">Calorías consumidas</label>
+        <label className="block text-sm text-gray-600">
+          Calorías consumidas
+        </label>
         <input
           type="number"
           inputMode="numeric"
@@ -180,9 +273,16 @@ export default function Home() {
           </span>
         </div>
         <div className="h-3 bg-blue-200 rounded-full overflow-hidden mb-3">
-          <div className="h-full bg-blue-500" style={{ width: `${aguaPct}%` }} />
+          <div
+            className="h-full bg-blue-500"
+            style={{ width: `${aguaPct}%` }}
+          />
         </div>
-        {aguaPct >= 100 && <p className="text-green-600 text-sm mb-2">✓ Meta de agua alcanzada</p>}
+        {aguaPct >= 100 && (
+          <p className="text-green-600 text-sm mb-2">
+            ✓ Meta de agua alcanzada
+          </p>
+        )}
         <button
           onClick={() => addAgua(500)}
           className="w-full bg-blue-500 text-white rounded-xl py-4 text-lg font-bold active:scale-95 transition"
@@ -222,6 +322,11 @@ export default function Home() {
             </p>
           </div>
         )}
+      </section>
+
+      <section className="bg-white rounded-2xl shadow p-4">
+        <h2 className="font-semibold mb-2">Tendencia</h2>
+        <TrendChart datos={historial} />
       </section>
     </main>
   );
