@@ -15,6 +15,9 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { weeklyRecompute, DailyLog } from "../_shared/nutrition.ts";
 
+// Lee el service_role real del proyecto (Supabase ya lo provee como
+// SUPABASE_SERVICE_ROLE_KEY). No usamos SB_SERVICE_ROLE_KEY para evitar
+// confusión con claves de demo.
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 

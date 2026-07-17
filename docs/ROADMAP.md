@@ -32,13 +32,14 @@ URLs verificadas (HTTP 200 / `/health` ok):
 | Trigger signup → `perfiles` (SECURITY DEFINER) | ✅ | verificado: insert en `auth.users` crea fila |
 | Frontend Vercel: login / signup / peso / calorías / agua / gráfico / correlación | ✅ | build verde + HTTP 200 |
 | Backend `/api/correlacion` (JWT + RLS) | ✅ | `/health` ok, 401 sin token |
-| **Motor `compute_weekly`** | ❌ | código listo, **NO desplegado**, sin cron, sin UI |
+| **Motor `compute_weekly`** | ✅ | desplegado (2026-07-17) + secrets (SUPABASE_SERVICE_ROLE_KEY nativo) + prueba `{all:true}` ok |
+| **Cron semanal `compute_weekly`** | ✅ | pg_cron `compute_weekly_all` lunes 06:00 UTC, activo |
+| **Onboarding** (altura/objetivo/déficit) | ✅ | UI en primer login, guarda en `perfiles` |
+| **Pantalla "Hoy" + coach** | ✅ | meta diaria + restante + TDEE + nota coach (web/app/page.tsx + lib/coach.ts) |
 | **Escáner barcode (`scan_barcode`)** | ❌ | código listo, **NO desplegado**, sin UI |
-| **Onboarding** (altura/objetivo/déficit) | ❌ | campos en BD, nunca seteados desde app |
-| **Diseño / UX** | ⚠️ | funcional pero "básico", clases inline sueltas |
+| **Diseño / UX** | ⚠️ | funcional pero "básico", clases inline sueltas, sin tabs/dark mode |
 | **Tests backend FastAPI** | ❌ | solo testeada la matemática, no los endpoints |
 | **CI** | ❌ | no hay GitHub Actions |
-| **Cron semanal `compute_weekly`** | ❌ | no configurado |
 
 ---
 
@@ -88,14 +89,14 @@ URLs verificadas (HTTP 200 / `/health` ok):
 
 ## 4. Roadmap por fases (propuestas — requieren aprobación)
 
-### Fase 1 — Que sea útil (ALTO valor, medio esfuerzo)  ← recomendada primero
-- [ ] Deploy `compute_weekly` (Edge Function) + set `SERVICE_ROLE` secret.
-- [ ] Cron semanal (pg_cron) que invoca `compute_weekly`.
-- [ ] Onboarding: altura / objetivo / % déficit en primer login.
-- [ ] Pantalla "Hoy": target de calorías + restante + TDEE estimado + coach.
+### Fase 1 — Que sea útil (ALTO valor, medio esfuerzo)  ← COMPLETA (2026-07-17)
+- [x] Deploy `compute_weekly` (Edge Function) + secrets (SUPABASE_SERVICE_ROLE_KEY nativo).
+- [x] Cron semanal (pg_cron) que invoca `compute_weekly` (lunes 06:00 UTC).
+- [x] Onboarding: altura / objetivo / % déficit en primer login.
+- [x] Pantalla "Hoy": target de calorías + restante + TDEE estimado + coach.
 - **Resultado:** la app ya "es MacroFactor" y da valor real.
 
-### Fase 2 — Que se vea producto (medio esfuerzo)
+### Fase 2 — Que se vea producto (medio esfuerzo)  ← SIGUIENTE
 - [ ] Sistema de diseño + navegación por tabs + dark mode + estados vacíos.
 - [ ] Meta de agua configurable + recordatorios.
 
