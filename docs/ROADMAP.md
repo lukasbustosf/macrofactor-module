@@ -101,9 +101,14 @@ URLs verificadas (HTTP 200 / `/health` ok):
 - [x] Meta de agua configurable + recordatorios.
 - **Resultado:** la app se siente producto (tabs Hoy/Semana/Agua/Perfil, dark mode, componentes Card/Button/Input/Tabs/Toggle/EmptyState).
 
-### Fase 3 — Diferencial comida (mayor esfuerzo)
-- [ ] Scanner barcode + registro de comidas por día + caché `alimentos`.
+### Fase 3 — Diferencial comida (mayor esfuerzo)  ← PARCIAL (2026-07-17)
+- [x] Registro de comidas por día (tabla `comidas`) + RLS + caché `alimentos`.
+- [x] Ingesta por horario (desayuno/almuerzo/once/cena/snack) en pestaña Comidas.
+- [x] Entrada manual rápida de macros (4 campos) + barcode (Open Food Facts, gratis).
+- [x] Menús/días favoritos (guardar día completo + clonar 1 click).
+- [ ] **OCR de foto de etiqueta** — PENDIENTE: requiere proveedor de visión (OpenAI/Anthropic/OS). Dejado como módulo pluggable.
 - [ ] Correlación agua 60-90 días + interpretación.
+- **Resultado:** ya es como MacroFactor en el flujo de registro (barcode + manual + horarios + menús). Falta OCR.
 
 ### Fase 4 — Robustez (bajo/medio)
 - [ ] Tests backend FastAPI + CI (GitHub Actions).
