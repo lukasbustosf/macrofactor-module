@@ -19,8 +19,16 @@ import {
   CoachBanner,
   Grid2,
 } from "@/components/dash";
+import { ComidaForm, ComidaList, ComidaRow } from "@/components/comida";
+import { MenuFavoritos } from "@/components/menu";
+import { TipoComida } from "@/lib/food";
 
 const supabase = createClient();
+
+interface MenuFav {
+  id: string;
+  nombre: string;
+}
 
 interface Registro {
   fecha: string;
@@ -38,7 +46,7 @@ interface Perfil {
 }
 
 const META_AGUA_ML = 3000;
-type TabId = "hoy" | "semana" | "agua" | "perfil";
+type TabId = "hoy" | "semana" | "agua" | "perfil" | "comidas";
 type Modo = "login" | "signup";
 
 export default function Home() {
@@ -50,6 +58,9 @@ export default function Home() {
   const [calorias, setCalorias] = useState("");
   const [historial, setHistorial] = useState<Registro[]>([]);
   const [perfil, setPerfil] = useState<Perfil | null>(null);
+
+  const [comidas, setComidas] = useState<ComidaRow[]>([]);
+  const [menus, setMenus] = useState<MenuFav[]>([]);
 
   const [corr, setCorr] = useState<any>(null);
   const [corrLoading, setCorrLoading] = useState(false);
@@ -115,10 +126,91 @@ export default function Home() {
     if (hist) setHistorial(hist as Registro[]);
   }
 
+  async function cargarComidas() {
+    if (!user) return;
+    const { data } = await supabase
+      .from("comidas")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("fecha", hoy);
+    if (data) setComidas(data as ComidaRow[]);
+    const { data: m } = await supabase
+      .from("menu_favorito")
+      .select("*")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+    if (m) setMenus(m as MenuFav[]);
+  }
+
+  async function guardarComida(c: Omit<ComidaRow, "id">) {
+    if (!user) return;
+    const { data, error } = await supabase
+      .from("comidas")
+      .insert({ ...c, user_id: user.id, fecha: hoy })
+      .select()
+      .single();
+    if (!error && data) setComidas((prev) => [...prev, data as ComidaRow]);
+  }
+
+  async function borrarComida(id: string) {
+    if (!user) return;
+    await supabase.from("comidas").delete().eq("id", id);
+    setComidas((prev) => prev.filter((c) => c.id !== id));
+  }
+
+  async function guardarMenu(nombre: string) {
+    if (!user || comidas.length === 0) return;
+    const { data, error } = await supabase
+      .from("menu_favorito")
+      .insert({ user_id: user.id, nombre })
+      .select()
+      .single();
+    if (error || !data) return;
+    const items = comidas.map((c) => ({
+      menu_id: data.id,
+      tipo_comida: c.tipo_comida,
+      nombre: c.nombre,
+      cantidad_g: c.cantidad_g,
+      kcal: c.kcal,
+      proteina: c.proteina,
+      carbohidrato: c.carbohidrato,
+      grasa: c.grasa,
+    }));
+    await supabase.from("menu_favorito_item").insert(items);
+    setMenus((prev) => [...prev, data as MenuFav]);
+  }
+
+  async function clonarMenu(menuId: string) {
+    if (!user) return;
+    const { data: items } = await supabase
+      .from("menu_favorito_item")
+      .select("*")
+      .eq("menu_id", menuId);
+    if (!items) return;
+    for (const it of items) {
+      await guardarComida({
+        tipo_comida: it.tipo_comida,
+        nombre: it.nombre,
+        cantidad_g: it.cantidad_g,
+        kcal: it.kcal,
+        proteina: it.proteina,
+        carbohidrato: it.carbohidrato,
+        grasa: it.grasa,
+      });
+    }
+  }
+
+  async function borrarMenu(menuId: string) {
+    if (!user) return;
+    await supabase.from("menu_favorito").delete().eq("id", menuId);
+    setMenus((prev) => prev.filter((m) => m.id !== menuId));
+  }
+
   useEffect(() => {
     if (user) {
       cargarPerfil();
       cargarRegistro();
+      cargarComidas();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
@@ -334,13 +426,15 @@ export default function Home() {
     confidence: historial.length >= 7 ? 0.6 : 0.2,
   });
   const metaDiaria = Math.round(c.targetIntake);
-  const consumido = registro?.calorias_consumidas ?? 0;
+  const consumidoDesdeComidas = comidas.reduce((a, c) => a + (c.kcal || 0), 0);
+  const consumido = consumidoDesdeComidas || registro?.calorias_consumidas || 0;
   const restante = metaDiaria - consumido;
   const agua = registro?.agua_ml ?? 0;
   const aguaPct = Math.min(100, Math.round((agua / META_AGUA_ML) * 100));
 
   const tabs = [
     { id: "hoy" as TabId, label: "Hoy", icon: "🏠" },
+    { id: "comidas" as TabId, label: "Comidas", icon: "🍽️" },
     { id: "semana" as TabId, label: "Semana", icon: "📈" },
     { id: "agua" as TabId, label: "Agua", icon: "💧" },
     { id: "perfil" as TabId, label: "Perfil", icon: "👤" },
@@ -542,6 +636,28 @@ export default function Home() {
               cargando datos para mejorar la estimación.
             </p>
           </Card>
+        </div>
+      )}
+
+      {tab === "comidas" && (
+        <div className="space-y-4 animate-fade-in">
+          <ComidaForm onAdd={guardarComida} />
+          <Card>
+            <h2 className="font-semibold mb-2">
+              Ingesta por horario
+              <span className="float-right text-brand-600 dark:text-brand-300">
+                {consumido} kcal
+              </span>
+            </h2>
+            <ComidaList rows={comidas} onDelete={borrarComida} />
+          </Card>
+          <MenuFavoritos
+            rows={comidas}
+            menus={menus}
+            onGuardar={guardarMenu}
+            onClonar={clonarMenu}
+            onEliminar={borrarMenu}
+          />
         </div>
       )}
     </main>
