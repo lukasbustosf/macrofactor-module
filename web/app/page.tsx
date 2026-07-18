@@ -13,6 +13,12 @@ import {
   Toggle,
   EmptyState,
 } from "@/components/ui";
+import {
+  Ring,
+  Stat,
+  CoachBanner,
+  Grid2,
+} from "@/components/dash";
 
 const supabase = createClient();
 
@@ -362,23 +368,47 @@ export default function Home() {
 
       {tab === "hoy" && (
         <div className="space-y-4 animate-fade-in">
-          <Card className="bg-gradient-to-br from-brand-500 to-purple-600 text-white border-0">
-            <p className="text-sm opacity-90">Tu objetivo de hoy</p>
-            <p className="text-3xl font-bold">{metaDiaria} kcal</p>
-            <div className="mt-2 text-sm opacity-90">
-              Consumido: {consumido} · Restante:{" "}
-              <b className={restante < 0 ? "text-red-200" : "text-green-200"}>
-                {restante} kcal
-              </b>
+          {/* Anillo de calorías */}
+          <Card className="flex items-center gap-4 border-0 bg-gradient-to-br from-brand-500 to-purple-600 text-white">
+            <Ring
+              pct={metaDiaria ? (consumido / metaDiaria) * 100 : 0}
+              value={`${consumido}`}
+              sub={`/ ${metaDiaria} kcal`}
+              label="Consumido hoy"
+              color="#fff"
+            />
+            <div className="flex-1 space-y-1">
+              <p className="text-sm opacity-90">Tu objetivo de hoy</p>
+              <p className="text-2xl font-bold">{restante >= 0 ? restante : 0} kcal</p>
+              <p className="text-xs opacity-80">
+                {restante >= 0 ? "restantes" : `excedido por ${Math.abs(restante)}`}
+              </p>
+              <p className="text-[11px] opacity-70 mt-1">
+                TDEE ~{Math.round(tdee)} · déficit {Math.round(deficit * 100)}%
+              </p>
             </div>
-            <p className="mt-1 text-xs opacity-80">
-              TDEE estimado: {Math.round(tdee)} kcal · déficit{" "}
-              {Math.round(deficit * 100)}%
-            </p>
-            {c.note && <p className="mt-2 text-xs opacity-90">{c.note}</p>}
           </Card>
 
+          <CoachBanner note={c.note} />
+
+          {/* Stats rápidos */}
+          <Grid2>
+            <Stat
+              label="Peso"
+              value={peso ? `${peso} kg` : "—"}
+              hint="ayunas"
+            />
+            <Stat
+              label="Agua"
+              value={`${Math.round(agua / 1000)}L`}
+              hint={`/ ${META_AGUA_ML / 1000}L meta`}
+              accent="text-blue-500"
+            />
+          </Grid2>
+
+          {/* Registro */}
           <Card className="space-y-3">
+            <h2 className="font-semibold">Registrar</h2>
             <Input
               label="Peso (ayunas, kg)"
               type="number"
@@ -397,6 +427,12 @@ export default function Home() {
             />
             <Button onClick={guardar}>Guardar registro</Button>
           </Card>
+
+          {/* Tendencia de peso */}
+          <Card>
+            <h2 className="font-semibold mb-1">Tendencia de peso</h2>
+            <TrendChart datos={historial} goalKg={null} />
+          </Card>
         </div>
       )}
 
@@ -412,7 +448,7 @@ export default function Home() {
           ) : (
             <Card>
               <h2 className="font-semibold mb-2">Tendencia</h2>
-              <TrendChart datos={historial} />
+              <TrendChart datos={historial} goalKg={null} />
             </Card>
           )}
           <Card>
