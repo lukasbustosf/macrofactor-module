@@ -42,6 +42,51 @@ export function ComidaForm({
   const [f, setF] = useState("");
   const [msg, setMsg] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+
+  async function analizarFoto(file: File) {
+    setOcrLoading(true);
+    setMsg("");
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      const jwt = session.session?.access_token;
+      if (!jwt) {
+        setMsg("No hay sesión activa.");
+        return;
+      }
+      const fr = new FileReader();
+      const b64: string = await new Promise((res) => {
+        fr.onload = () => res(fr.result as string);
+        fr.readAsDataURL(file);
+      });
+      const fn = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ocr_label`;
+      const res = await fetch(fn, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image_base64: b64 }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        setMsg(json.error ?? "No se pudo leer la etiqueta.");
+        return;
+      }
+      setNombre(json.nombre ?? "");
+      setGramos(String(json.porcion_g ?? 100));
+      setKcal(String(json.macros?.kcal ?? ""));
+      setP(String(json.macros?.proteina ?? ""));
+      setC(String(json.macros?.carbohidrato ?? ""));
+      setF(String(json.macros?.grasa ?? ""));
+      setMsg(`✓ OCR: ${json.nombre}`);
+      setTab("manual");
+    } catch (e: any) {
+      setMsg(String(e));
+    } finally {
+      setOcrLoading(false);
+    }
+  }
 
   async function buscarBarcode() {
     setLoading(true);
@@ -128,8 +173,24 @@ export function ComidaForm({
       )}
 
       {tab === "foto" && (
-        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-4 text-center text-sm text-slate-400">
-          📷 OCR de etiqueta: próximamente (requiere proveedor de visión)
+        <div className="rounded-xl border border-dashed border-slate-300 dark:border-slate-600 p-4 text-center">
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) analizarFoto(file);
+            }}
+            className="w-full text-sm"
+          />
+          {ocrLoading && (
+            <p className="text-sm text-brand-600 dark:text-brand-300 mt-2">
+              Leyendo etiqueta…
+            </p>
+          )}
+          <p className="text-xs text-slate-400 mt-2">
+            Sube la foto de la etiqueta nutricional y se autocompleta.
+          </p>
         </div>
       )}
 
