@@ -36,54 +36,40 @@ URLs verificadas (HTTP 200 / `/health` ok):
 | **Cron semanal `compute_weekly`** | ✅ | pg_cron `compute_weekly_all` lunes 06:00 UTC, activo |
 | **Onboarding** (altura/objetivo/déficit) | ✅ | UI en primer login, guarda en `perfiles` |
 | **Pantalla "Hoy" + coach** | ✅ | meta diaria + restante + TDEE + nota coach (web/app/page.tsx + lib/coach.ts) |
-| **Escáner barcode (`scan_barcode`)** | ❌ | código listo, **NO desplegado**, sin UI |
-| **Diseño / UX** | ⚠️ | funcional pero "básico", clases inline sueltas, sin tabs/dark mode |
+| Escáner barcode (`scan_barcode`) | ✅ | código listo + usado vía Open Food Facts en UI Comidas |
+| **Diseño / UX** | ✅ | tabs Hoy/Comidas/Semana/Agua/Perfil + dark mode + componentes |
+| **Registro de comidas + horarios + menús** | ✅ | tabla `comidas`, `menu_favorito` + RLS, UI Comidas |
+| **OCR etiqueta** | ✅ | Tesseract.js local (sin API key) + `ocr_label` edge fn opcional |
 | **Tests backend FastAPI** | ❌ | solo testeada la matemática, no los endpoints |
 | **CI** | ❌ | no hay GitHub Actions |
 
 ---
 
-## 3. Lo que falta, en profundidad
+## 3. Lo que falta (estado real 2026-07-17)
 
-### A. Funcionalidad core (el "cerebro" de MacroFactor)
-1. **Superficie el motor adaptativo.** `compute_weekly` ya calcula
-   `tdee_actual` y `target_intake`, pero no está deployado ni corre solo ni
-   se muestra. Hoy el usuario no ve su gasto estimado ni su objetivo diario.
-2. **Pantalla "Hoy" con target.** Mostrar: calorías objetivo del día,
-   consumidas, restante; TDEE estimado; peso trend.
-3. **Coach / recomendación.** `coach.py` tiene la lógica (cut/bulk/maint,
-   signo del ajuste) pero no está expuesta en UI.
-4. **Onboarding.** Al primer login pedir altura, objetivo, % déficit.
-   Hoy `perfiles` queda con defaults (2500 / cut / 15%).
-5. **Checkins semanales visibles.** Delta de peso, confianza, TDEE por semana.
-6. **Historial editable / borrable.**
+### Ya entregado (Fase 1 + 2 + 2.5 + 3)
+- Motor adaptativo `compute_weekly` desplegado + pg_cron + pantalla Hoy + coach + onboarding.
+- Diseño: tabs, dark mode, componentes, estados vacíos, dashboard Hoy.
+- Comidas: registro por horario, barcode (Open Food Facts), manual, OCR local
+  (Tesseract.js), menús favoritos (clonar). Tabla `comidas` + `menu_favorito` + RLS.
 
-### B. Diferencial agua (empezado)
-7. Correlación con ventana 60-90 días + interpretación clara.
-8. Recordatorios de agua (push/notificación).
-9. Meta de agua configurable (hoy hardcode 3000 ml).
+### Pendiente de valor (producto)
+1. **Checkins semanales visibles.** El TDEE se calcula y guarda en `checkins`
+   pero no hay pantalla que los muestre (delta de peso, confianza, TDEE por
+   semana). → pestaña "Semana" ya muestra tendencia de peso; falta mostrar
+   fila de `checkins` (TDEE estimado histórico).
+2. **Correlación agua 60-90 días + interpretación.** El backend ya corre con
+   ventana de 30 días; extender a 60-90 y mejorar texto.
+3. **Recordatorios de agua** (push/notificación) — no implementado.
+4. **Historial editable / borrable** de peso (hoy solo agua/comidas se borran).
+5. **Pantalla "Explorar" / BD de alimentos** para reusar `alimentos` cacheados.
 
-### C. Comida
-10. Integrar scanner barcode en registro de comida → Open Food Facts →
-    caché en `alimentos`. Hoy no hay UI de comida.
-11. Registro de comidas por día (no solo un número total).
+### Infra / robustez (Fase 4)
+6. Tests backend FastAPI (endpoints) + CI (GitHub Actions: pytest + tsx + build).
+7. Rate limit en `/api/correlacion`.
 
-### D. Diseño / UX
-12. Sistema de diseño real: tokens, componentes (Card/Button/Input),
-    dark mode, responsive, iconos.
-13. Navegación por tabs: Hoy / Semana / Agua / Perfil.
-14. Estados vacíos, loading skeletons, feedback de guardado.
-
-### E. Infra / despliegue
-15. Deploy Edge Functions + set `SERVICE_ROLE` secret.
-16. Cron semanal (recomendado: pg_cron de Supabase).
-17. Tests del backend FastAPI (endpoints).
-18. CI (GitHub Actions: pytest + tsx + build).
-
-### F. Seguridad (crítico, pendiente desde el inicio)
-19. **Rotar `service_role` + password BD expuestas en el chat.**
-20. Rate limit en `/api/correlacion`.
-21. Vigilar no commitear secrets.
+### Seguridad
+- (Omitido a petición del usuario — ver nota en sesión.)
 
 ---
 
