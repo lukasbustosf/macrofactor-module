@@ -58,3 +58,47 @@ export const TIPO_LABEL: Record<TipoComida, string> = {
   cena: "🌙 Cena",
   snack: "🍎 Snack",
 };
+
+/**
+ * Extrae macros de un texto de etiqueta (OCR de Tesseract u otro).
+ * Busca líneas "X valor unidad" para energía/kcal, proteínas, carbohidratos,
+ * grasas. Tolerante a ruido OCR (coma/punto, mayúsculas, acentos).
+ */
+export function parseNutritionLabel(text: string): {
+  porcion_g: number;
+  macros: Macro;
+} | null {
+  const t = text.toLowerCase();
+  const numAfter = (re: RegExp): number => {
+    const m = t.match(re);
+    if (!m) return 0;
+    const n = parseFloat(m[1].replace(",", "."));
+    return isNaN(n) ? 0 : n;
+  };
+
+  const porcion_g =
+    numAfter(/porc[ií]on[^0-9]*?([0-9]+(?:[.,][0-9]+)?)\s*g\b/) ||
+    numAfter(/contenido[^0-9]*?([0-9]+(?:[.,][0-9]+)?)\s*g\b/);
+
+  const kcal =
+    numAfter(/(?:energ[ií]a|valor energ[eé]tico|kcal)[^0-9]*?([0-9]+(?:[.,][0-9]+)?)/) ||
+    numAfter(/(?<![\w])k?cal\.?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/);
+  const proteina = numAfter(/prote[ií]nas?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/);
+  const carbohidrato = numAfter(
+    /carbohidratos?\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/,
+  );
+  const grasa = numAfter(
+    /(grasas?\s*(?:totales?|l[ií]pidas?)?|grasa)\s*[:=]?\s*([0-9]+(?:[.,][0-9]+)?)/,
+  );
+
+  if (!kcal && !proteina && !carbohidrato && !grasa) return null;
+  return {
+    porcion_g: porcion_g || 100,
+    macros: {
+      kcal: Math.round(kcal),
+      proteina: Math.round(proteina * 10) / 10,
+      carbohidrato: Math.round(carbohidrato * 10) / 10,
+      grasa: Math.round(grasa * 10) / 10,
+    },
+  };
+}

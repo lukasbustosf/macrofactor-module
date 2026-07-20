@@ -9,11 +9,13 @@ import {
 import {
   lookupBarcode,
   scaleMacros,
+  parseNutritionLabel,
   Macro,
   TIPOS_COMIDA,
   TIPO_LABEL,
   TipoComida,
 } from "@/lib/food";
+import Tesseract from "tesseract.js";
 
 export interface ComidaRow {
   id: string;
@@ -46,40 +48,23 @@ export function ComidaForm({
 
   async function analizarFoto(file: File) {
     setOcrLoading(true);
-    setMsg("");
+    setMsg("Leyendo etiqueta (OCR local)…");
     try {
-      const { data: session } = await supabase.auth.getSession();
-      const jwt = session.session?.access_token;
-      if (!jwt) {
-        setMsg("No hay sesión activa.");
+      const worker = await Tesseract.createWorker("spa", 1);
+      const { data } = await worker.recognize(file);
+      await worker.terminate();
+      const parsed = parseNutritionLabel(data.text);
+      if (!parsed) {
+        setMsg("No detecté macros en la imagen. Completa a mano.");
+        setTab("manual");
         return;
       }
-      const fr = new FileReader();
-      const b64: string = await new Promise((res) => {
-        fr.onload = () => res(fr.result as string);
-        fr.readAsDataURL(file);
-      });
-      const fn = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/ocr_label`;
-      const res = await fetch(fn, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${jwt}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ image_base64: b64 }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) {
-        setMsg(json.error ?? "No se pudo leer la etiqueta.");
-        return;
-      }
-      setNombre(json.nombre ?? "");
-      setGramos(String(json.porcion_g ?? 100));
-      setKcal(String(json.macros?.kcal ?? ""));
-      setP(String(json.macros?.proteina ?? ""));
-      setC(String(json.macros?.carbohidrato ?? ""));
-      setF(String(json.macros?.grasa ?? ""));
-      setMsg(`✓ OCR: ${json.nombre}`);
+      setGramos(String(parsed.porcion_g ?? 100));
+      setKcal(String(parsed.macros.kcal));
+      setP(String(parsed.macros.proteina));
+      setC(String(parsed.macros.carbohidrato));
+      setF(String(parsed.macros.grasa));
+      setMsg("✓ OCR local: completa lo que falte");
       setTab("manual");
     } catch (e: any) {
       setMsg(String(e));
